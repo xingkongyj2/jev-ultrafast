@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from jev_ultrafast import agent as loop
-from jev_ultrafast import model
+from jev_ultrafast import demo, model
 from jev_ultrafast.browser import StalePage, browser_operation, fingerprint
 
 
@@ -149,6 +149,29 @@ def test_quoted_task_text_still_uses_the_llm(monkeypatch):
     assert post.call_count == 1
     sent = json.loads(post.call_args.args[2]["messages"][1]["content"])
     assert sent["goal"] == 'Fly from "Zurich" to London'
+
+
+def test_responses_api_text_helper_uses_input_and_output_text(monkeypatch):
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    monkeypatch.setenv("TEXT_MODEL_API", "responses")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "https://provider.test/openai/pro")
+    monkeypatch.setenv("TEXT_MODEL_REASONING", "none")
+    post = Mock(
+        return_value={
+            "status": "completed",
+            "output": [
+                {"type": "reasoning", "summary": []},
+                {"type": "message", "content": [{"type": "output_text", "text": '{"text":"Zurich"}'}]},
+            ],
+        }
+    )
+    monkeypatch.setattr(model, "post_json", post)
+    assert model.field_text({"goal": 'Enter "Zurich"'})[0] == "Zurich"
+    url, _, body = post.call_args.args
+    assert url == "https://provider.test/openai/pro/responses"
+    assert body["input"][0]["content"] == model.TEXT_VALUE
+    assert body["reasoning"] == {"effort": "minimal"}
+    assert "messages" not in body and "max_tokens" not in body
 
 
 def test_missing_text_credential_stops_before_guessing(monkeypatch):
@@ -318,3 +341,9 @@ def test_navigation_during_prediction_reobserves_without_action(runner):
     assert runner.state["status"] == "ready"
     assert runner.state["decision"] is None
     runner.state["browser"].act.assert_not_called()
+
+
+@pytest.mark.parametrize("url", ["", "file:///etc/passwd", "javascript:alert(1)", "ftp://example.test/"])
+def test_custom_demo_scenario_only_accepts_http_urls(url):
+    with pytest.raises(ValueError, match="http or https"):
+        demo.command("reset", {"scenario": "custom", "goal": "Read the page", "url": url})

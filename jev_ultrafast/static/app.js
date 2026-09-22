@@ -8,6 +8,7 @@ const goals = {
   travel: 'Find a Design stay in Lisbon with Free cancellation and open Casa Flora.',
   research:
     "Open the article about using finite choices to control browser agents.",
+  custom: "",
 };
 const escape = (value) =>
   String(value ?? "").replace(
@@ -35,6 +36,7 @@ function controls() {
   $("start").disabled = busy;
   $("scenario").disabled = busy;
   $("goal").disabled = busy;
+  $("start-url").disabled = busy;
   $("choose").disabled = busy || !live;
   $("execute").disabled = busy || !state?.decision || !live;
   $("auto").disabled = busy || !live;
@@ -128,7 +130,7 @@ function render() {
     ? state.history
         .map(
           (h) =>
-            `<div class="trace-row"><span class="number">${String(h.step).padStart(2, "0")}</span><div>${escape(h.action)}${h.text ? ` <b>“${escape(h.text)}”</b><small>${escape(h.text_helper)}</small>` : ""}</div><span class="time">${h.latency_ms} ms · ${percent(h.probability)}</span><span class="effect">${h.page_changed ? "Page changed" : "No change observed"}</span></div>`,
+            `<div class="trace-row"><span class="number">${String(h.step).padStart(2, "0")}</span><div>${escape(h.action)}${h.text ? ` <b>“${escape(h.text)}”</b><small>${escape(h.text_helper)} · ${h.text_latency_ms} ms</small>` : ""}</div><span class="time">${h.latency_ms} ms · ${percent(h.probability)}</span><span class="effect">${h.page_changed ? "Page changed" : "No change observed"}</span></div>`,
         )
         .join("")
     : '<p class="muted">Each executed action leaves an observed result.</p>';
@@ -150,11 +152,16 @@ $("task-form").addEventListener("submit", (event) => {
   automatic = false;
   perform(
     () =>
-      call("reset", { scenario: $("scenario").value, goal: $("goal").value }),
+      call("reset", {
+        scenario: $("scenario").value,
+        goal: $("goal").value,
+        url: $("start-url").value,
+      }),
     "Opening a fresh browser…",
   );
 });
 $("scenario").addEventListener("change", () => {
+  $("url-row").hidden = $("scenario").value !== "custom";
   $("goal").value = goals[$("scenario").value];
 });
 $("choose").addEventListener("click", () =>

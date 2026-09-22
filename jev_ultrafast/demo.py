@@ -45,16 +45,25 @@ def command(name, body):
     global AGENT
     if name == "reset":
         scenario = body.get("scenario", "flights")
-        if scenario not in {"travel", "research", "flights"}:
+        if scenario not in {"travel", "research", "flights", "custom"}:
             raise ValueError("Unknown demo scenario")
         goal = body.get("goal", "").strip()
         if not goal or len(goal) > 2000:
             raise ValueError("Enter 1–2,000 characters")
+        if scenario == "custom":
+            # Observed page text is sent to the model providers, so only public web pages qualify.
+            url = body.get("url", "").strip()
+            if not url.startswith(("http://", "https://")) or len(url) > 2000:
+                raise ValueError("Enter an http or https URL")
+        else:
+            url = (
+                "https://www.google.com/travel/flights?hl=en"
+                if scenario == "flights"
+                else f"{ORIGIN}/fixture.html?scenario={scenario}"
+            )
         close_browser()
         AGENT = Agent(
-            "https://www.google.com/travel/flights?hl=en"
-            if scenario == "flights"
-            else f"{ORIGIN}/fixture.html?scenario={scenario}",
+            url,
             goal,
             screenshots=True,
             record_dir=Path.cwd() / "artifacts" / "frames" if body.get("record") else None,
